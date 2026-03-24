@@ -23,8 +23,7 @@ type Environment struct {
 
 func NewEnvironment() *Environment {
 	return &Environment{
-		Stack:      make([]*Task, 0),
-		timerQueue: make([]*Task, 0),
+		Stack: make([]*Task, 0),
 	}
 }
 
@@ -65,7 +64,6 @@ func (e *Environment) Run() {
 
 		executedTasks++
 		if err := task.Fn(); err != nil {
-			// panic(err) // what try-catch feels like
 			fmt.Fprintf(os.Stderr, "uncaught exception: err: %s\n", err)
 			return
 		}
