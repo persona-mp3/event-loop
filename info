@@ -1,0 +1,8 @@
+body: [0x14000112050 0x14000120070]
+declarations: []
+file: &{{{} {0 0}} file.js function hello_wolrd() {
+	console.log("ast from package")
+}
+
+hello_wolrd()
+ 1 <nil> [] 0}

@@ -1,0 +1,16 @@
+body: [0x14000096048 0x14000096050 0x14000096058]
+
+declarations: []
+file: &{mu:{_:{} mu:{state:0 sema:0}} name:file.js src:async function make_request() {
+	const response = await fetch("pokemon.url")
+	const data = await response.json()
+}
+
+function timeout_func() {
+	setTimeout(make_request, 3000)
+}
+
+function main() {
+	console.log("inspecting the ast module")
+}
+ base:1 sourceMap:<nil> lineOffsets:[] lastScannedOffset:0}
