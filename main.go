@@ -1,54 +1,86 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"persona/event"
 	"time"
 )
 
-type Task struct {
-	fn       func(...any) any
-	duration *time.Duration
-}
-
-type EventLoop struct {
-	Tasks         []*Task
-	timerQueue    []*Task
-	callbackQueue []*Task
-}
-
-func NewEventLoop() *EventLoop {
-	return &EventLoop{
-		Tasks:         make([]*Task, 0),
-		timerQueue:    make([]*Task, 0), // don't know if there are any costs of this
-		callbackQueue: make([]*Task, 0),
+func readFile() error {
+	content, err := os.ReadFile("main.go.txt")
+	if err != nil {
+		return err
 	}
+
+	_ = content
+	fmt.Println("read file successfully")
+	return nil
 }
 
-func genTask() []*Task {
-	t1 := &Task{fn: func(a ...any) any {
-		fmt.Println("running task_1")
-		return nil
-	}, duration: nil}
+func makeHttpRequest() error {
+	res, err := http.Get("https://example.com")
+	if err != nil {
+		return err
+	}
 
-	dur_2 := time.Second * 2
-	t2 := &Task{fn: func(a ...any) any {
-		fmt.Println("running task_2")
-		return nil
-	}, duration: &dur_2}
+	defer res.Body.Close()
+	content, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
 
-	dur := time.Second * 3
-	t3 := &Task{fn: func(a ...any) any {
-		fmt.Println("running task_3")
-		return nil
-	}, duration: &dur}
+	_ = content
+	// fmt.Printf("response from example.com")
+	// fmt.Println(string(content))
+	fmt.Println("http_request successfull")
+	return nil
+}
 
-	tasks := []*Task{t1, t2, t3}
+func readInput() error {
+	scanner := bufio.NewScanner(os.Stdin)
+	var username string
+	var bio string
+	fmt.Print("Please provide username: ")
+	scanner.Scan()
+	username = scanner.Text()
+	fmt.Print("Please provide bio: ")
+	scanner.Scan()
+	bio = scanner.Text()
 
-	return tasks
+	fmt.Printf("%s has a bio that says: %s\n", username, bio)
+	return nil
+}
+
+func newTasks() []*event.Task {
+	t1 := &event.Task{
+		Id: "read_file",
+		Fn: readFile,
+	}
+
+	d := time.Second * 3
+	t2 := &event.Task{
+		Id:       "read_input",
+		Fn:       readInput,
+		Duration: &d,
+	}
+
+	d2 := time.Second * 2
+	t3 := &event.Task{
+		Id:       "make_request",
+		Fn:       makeHttpRequest,
+		Duration: &d2,
+	}
+
+	return []*event.Task{t1, t2, t3}
 }
 
 func main() {
-	loop := NewEventLoop()
-	loop.Tasks = genTask()
-	loop.execute()
+	tasks := newTasks()
+	node := event.NewEnvironment()
+	node.Stack = tasks
+	node.Run()
 }
