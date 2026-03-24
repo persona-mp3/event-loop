@@ -119,6 +119,20 @@ func (rt *Runtime) Run() {
 
 	// nexttickerqueue simply places functions next on the stack, with methods like
 	// `setimmediate` in js, so we just leave it's execution to the main run
+	// So regarding this race condition
+	// we could do something like this:
+	// func drainQueue(q *Queue, send chan<- *Process) {
+	//   m.RLock()
+	//   for _, p := q {
+	//       send <- p
+	//    }
+	//   m.RUnLock()
+	// }
+	// We need to actually drain all the current Processes in here
+	// but we also need to stop all writing to q. So either we 
+	// just consume them through a channel, or just copy it over 
+	// But when you look at perf, that's probably the last thing that we'd need to do 
+	// unless go can handle it properly? then it would be rt.Snapshot(q) -> *[]Task
 	for _, process := range nextTickerQueue {
 		totalExecuted++
 		result, err := process.Execute()
@@ -183,7 +197,6 @@ func startNextTickQueue(ctx context.Context, in <-chan *Process) <-chan *Process
 	return out
 }
 
-
 func startPromiseQueue(ctx context.Context, in <-chan *Process) <-chan *Process {
 	out := make(chan *Process)
 	results := make(chan *Process)
@@ -212,7 +225,6 @@ func startPromiseQueue(ctx context.Context, in <-chan *Process) <-chan *Process 
 	}()
 	return out
 }
-
 
 func (p *Process) executePromise(ctx context.Context, out chan<- *Process) {
 	var result any
