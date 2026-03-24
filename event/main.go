@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"slices"
+	"sync"
 	"time"
 )
 
@@ -113,7 +113,7 @@ func (rt *Runtime) Run() {
 		fmt.Println(" ==========")
 	}
 
-	rt.Stack = slices.Delete(rt.Stack, 0, len(rt.Stack))
+	rt.Stack = nil
 
 	// Now we need to read from each of these queues
 
@@ -136,7 +136,7 @@ func (rt *Runtime) Run() {
 	// TODO(daniel) The actual stack pops fn calls as soon as they're done
 	// but for saftey, we could just clear it out, then later
 	// on if need be, we can clear upon each iteration
-	nextTickerQueue = slices.Delete(nextTickerQueue, 0, len(nextTickerQueue))
+	nextTickerQueue = nil
 
 	// The promise queue are basically functions that
 	// are native promises in js ie async/await
@@ -157,7 +157,7 @@ func (rt *Runtime) Run() {
 
 	}
 
-	promiseQueue = slices.Delete(promiseQueue, 0, len(promiseQueue))
+	promiseQueue = nil
 
 	fmt.Printf("total processes executed: %d vs total processes provided: %d\n", totalExecuted, allTasks)
 
