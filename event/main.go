@@ -44,6 +44,11 @@ type Process struct {
 	Duration *time.Duration
 }
 
+type queue struct {
+	mu        sync.RWMutex
+	processes []*Process
+}
+
 type Runtime struct {
 	Stack                  []*Process
 	inboundNextTickerCh    chan *Process
@@ -58,6 +63,13 @@ func NewRunTime() *Runtime {
 	}
 }
 
+func newQueue() *queue {
+	return &queue{
+		mu:        sync.RWMutex{},
+		processes: make([]*Process, 0),
+	}
+}
+
 func (rt *Runtime) Run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -66,17 +78,23 @@ func (rt *Runtime) Run() {
 	inboundPromiseTickerCh := startPromiseQueue(ctx, rt.inboundPromiseTickerCh)
 
 	// start filling up queues
-	var promiseQueue []*Process
-	var nextTickerQueue []*Process
+	// var promiseQueue []*Process
+	// var nextTickerQueue []*Process
+	promiseQueue := newQueue()
+	nextTickerQueue := newQueue()
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case p := <-inboundPromiseTickerCh:
-				promiseQueue = append(promiseQueue, p)
+				promiseQueue.mu.Lock()
+				promiseQueue.processes = append(promiseQueue.processes, p)
+				promiseQueue.mu.Unlock()
 			case p := <-nextTickerCh:
-				nextTickerQueue = append(nextTickerQueue, p)
+				nextTickerQueue.mu.Lock()
+				nextTickerQueue.processes = append(nextTickerQueue.processes, p)
+				nextTickerQueue.mu.Unlock()
 			}
 		}
 	}()
@@ -116,24 +134,8 @@ func (rt *Runtime) Run() {
 	rt.Stack = nil
 
 	// Now we need to read from each of these queues
-
-	// nexttickerqueue simply places functions next on the stack, with methods like
-	// `setimmediate` in js, so we just leave it's execution to the main run
-	// So regarding this race condition
-	// we could do something like this:
-	// func drainQueue(q *Queue, send chan<- *Process) {
-	//   m.RLock()
-	//   for _, p := q {
-	//       send <- p
-	//    }
-	//   m.RUnLock()
-	// }
-	// We need to actually drain all the current Processes in here
-	// but we also need to stop all writing to q. So either we 
-	// just consume them through a channel, or just copy it over 
-	// But when you look at perf, that's probably the last thing that we'd need to do 
-	// unless go can handle it properly? then it would be rt.Snapshot(q) -> *[]Task
-	for _, process := range nextTickerQueue {
+	callbacks := drainQueue(nextTickerQueue)
+	for _, process := range callbacks {
 		totalExecuted++
 		result, err := process.Execute()
 		if err != nil {
@@ -146,18 +148,13 @@ func (rt *Runtime) Run() {
 		fmt.Println(" ==========")
 
 	}
-
-	// TODO(daniel) The actual stack pops fn calls as soon as they're done
-	// but for saftey, we could just clear it out, then later
-	// on if need be, we can clear upon each iteration
-	nextTickerQueue = nil
-
 	// The promise queue are basically functions that
 	// are native promises in js ie async/await
 	// Since these functions need to be executed in the background, their
 	// results and error are provided in the process, and now Run can just
 	// read from them instead of wrapping it in another function
-	for _, process := range promiseQueue {
+	promiseCallbacks := drainQueue(promiseQueue)
+	for _, process := range promiseCallbacks {
 		totalExecuted++
 		if process.err != nil {
 			fmt.Fprintf(os.Stderr, "error executing fn <%s>\n", process.Id)
@@ -171,8 +168,6 @@ func (rt *Runtime) Run() {
 
 	}
 
-	promiseQueue = nil
-
 	fmt.Printf("total processes executed: %d vs total processes provided: %d\n", totalExecuted, allTasks)
 
 	// TODO(daniel)  We'll need to check the normal stack
@@ -180,6 +175,23 @@ func (rt *Runtime) Run() {
 	// the Run() would need to take an in channel that it spins from
 	// and when no more functions to leaves it and listens from the others
 	// it's going to be a bit tricky, but we'll get there
+}
+
+// reads from a queue using the mutex stored
+// assigned to them, and returns a copy of all
+// processes in the queue at the time.
+// After that, the queue is cleared.
+func drainQueue(q *queue) []*Process {
+	var snapshot []*Process
+	q.mu.Lock()
+	for _, p := range q.processes {
+		snapshot = append(snapshot, p)
+	}
+	// clear the queue
+	q.processes = nil
+	q.mu.Unlock()
+
+	return snapshot
 }
 
 func startNextTickQueue(ctx context.Context, in <-chan *Process) <-chan *Process {
