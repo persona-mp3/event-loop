@@ -1,0 +1,26 @@
+So I can't define concurrency I can only
+describe it as sending 3 minions to go do 
+some stuff. One could 1) get groceries, 
+2) do the laundry, 3) clean the car
+and then you could continue watching JJK.
+
+Now any one of these minions could 
+be asleep mid journey, or the just stopped
+But also these could be doing different tasks 
+at the same time. IE while one is walking 
+around the shop confused, the other could be  
+playing Take 5 on the car stereo, thats parralelism
+
+One thing here is that, you don't control the process
+or states of these minions, the either stop, or 
+just continue, or they wait for each other
+
+Same with go-routines. The just spin them, the Go Scheduler 
+can then map them out to different processors or the same 
+processor. We just design or spin up many things and don't
+care about them, only results
+
+And when you do need to coordinate these results you easily 
+can (not looking at you java). So concurrency is just design
+and parallelism is you telling the kernel you know better than it 
+or rather, actual execution

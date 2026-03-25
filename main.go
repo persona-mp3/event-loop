@@ -10,37 +10,36 @@ import (
 	"time"
 )
 
-func readFile() error {
+func readFile() (any, error) {
 	content, err := os.ReadFile("main.go.txt")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	_ = content
 	fmt.Println("read file successfully")
-	return nil
+	return "read file successfully", nil
 }
 
-func makeHttpRequest() error {
+func makeHttpRequest() (any, error) {
 	res, err := http.Get("https://example.com")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	defer res.Body.Close()
 	content, err := io.ReadAll(res.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	_ = content
 	// fmt.Printf("response from example.com")
 	// fmt.Println(string(content))
-	fmt.Println("http_request successfull")
-	return nil
+	return "http_request successfull", nil
 }
 
-func readInput() error {
+func readInput() (any, error) {
 	scanner := bufio.NewScanner(os.Stdin)
 	var username string
 	var bio string
@@ -51,36 +50,41 @@ func readInput() error {
 	scanner.Scan()
 	bio = scanner.Text()
 
-	fmt.Printf("%s has a bio that says: %s\n", username, bio)
-	return nil
+	result := fmt.Sprintf("%s has a bio that says: %s\n", username, bio)
+	return result, nil
 }
 
-func newTasks() []*event.Task {
-	t1 := &event.Task{
-		Id: "read_file",
-		Fn: readFile,
+func newTasks() []*event.Process {
+	t1 := &event.Process{
+		Id:      "read_file",
+		Execute: readFile,
+		Meta:    event.IOMeta,
 	}
 
-	d := time.Second * 3
-	t2 := &event.Task{
-		Id:       "read_input",
-		Fn:       readInput,
-		Duration: &d,
+	t2 := &event.Process{
+		Id:      "read_input",
+		Execute: readInput,
+		Meta: event.NoMeta,
 	}
 
 	d2 := time.Second * 2
-	t3 := &event.Task{
-		Id:       "make_request",
-		Fn:       makeHttpRequest,
+	t3 := &event.Process{
 		Duration: &d2,
+		Id:       "make_request",
+		Execute:  makeHttpRequest,
+		Meta:     event.TimerMeta,
 	}
 
-	return []*event.Task{t1, t2, t3}
+	return []*event.Process{t1, t2, t3}
 }
 
 func main() {
-	tasks := newTasks()
-	node := event.NewEnvironment()
-	node.Stack = tasks
-	node.Run()
+	// tasks := newTasks()
+	// node := event.NewEnvironment()
+	// node.Stack = tasks
+	// node.Run()
+
+	rt := event.NewRunTime()
+	rt.Stack = newTasks()
+	rt.Run()
 }
