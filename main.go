@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"persona/runtime"
+	"sync"
+	"time"
 )
 
 func readFile() (any, error) {
@@ -20,6 +22,7 @@ func readFile() (any, error) {
 }
 
 func makeHttpRequest() (any, error) {
+	n := time.Now()
 	res, err := http.Get("https://example.com")
 	if err != nil {
 		return nil, err
@@ -34,6 +37,8 @@ func makeHttpRequest() (any, error) {
 	_ = content
 	// fmt.Printf("response from example.com")
 	// fmt.Println(string(content))
+	t := time.Since(n)
+	fmt.Printf("tt for whole_request: %+v\n", t)
 	return "http_request successfull", nil
 }
 
@@ -83,6 +88,27 @@ func main() {
 			src <- t
 		}
 	}()
-	rt.Start(src)
-	fmt.Println("shit your pants")
+	done := make(chan any)
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rt.Start(src, done)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		res, open := <-done
+		if !open {
+			fmt.Println("the runtime closed the done channel!")
+			return
+		}
+
+		fmt.Printf("recvd: <%+v> from runtime\n", res)
+	}()
+
+	wg.Wait()
 }
