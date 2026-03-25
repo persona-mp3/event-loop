@@ -1,4 +1,4 @@
-package main
+package event
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 )
 
 // Problem statement
-// We need a way to context-switch between each queue and the main stack
+// We need a way to context-switch between each queue_ and the main stack
 // Although Node doesnt 'context-switch', everything is turn based
 // 					mainStack microQueue ioQueue timerQueue
 // 						^          *
@@ -19,22 +19,22 @@ import (
 //  _ :  already_emptied_s
 //  * :  next_executino_s
 
-type queue struct {
+type queue_ struct {
 	mu *sync.RWMutex
 	tasks []string
 }
 
 func main() {
-	stack := &queue{}
-	next_ticker := &queue{}
-	promise := &queue{}
+	stack := &queue_{}
+	next_ticker := &queue_{}
+	promise := &queue_{}
 	// can we get something like a signal?
 	for {
-		readqueue(stack)
+		readqueue_(stack)
 
-		readqueue(next_ticker)
+		readqueue_(next_ticker)
 
-		readqueue(promise)
+		readqueue_(promise)
 	}
 }
 
@@ -48,23 +48,78 @@ const (
 )
 
 type env struct {
-	stack   *queue
-	micro   *queue
-	promise *queue
+	stack   *queue_
+	micro   *queue_
+	promise *queue_
 	src     chan string
 }
 
 // so this is just the 'runtime' executing functions continously, theh
 // stack will be fed from an outside source.
 // we first check the stack inside the while loop and block till we receive a done
-// then switch to the micro queue, and then back to the stack and so forth
+// then switch to the micro queue_, and then back to the stack and so forth
 func (e *env) iterator() {
 	for task := range e.src {
-		// filter tasks to stack or micro or promise queues
+		// filter tasks to stack or micro or promise queue_s
 		// so only this one is writing
 		_ = task
 	}
 }
+
+
+/*
+So the new issue is that these apis dont really ever
+start doing their work? But it's kinda funky trying to 
+tell go routines to do work if theres something in their queue
+
+func third_party(ctx, source <-chan *Process){
+	for {
+		select {
+			case p := <-source:
+				switch p.Meta {
+					case promise:
+						 go run_promise(ctx, p, rt.promise_stack)
+					case io:
+						go run_io(ctx, p, rt.io_stack)
+					case timeout:
+						go run_timeout(ctx, p, rt.timeout_stack)
+				}
+			case <-ctx.Done():
+				return
+		}
+	}
+}
+
+func (rt *runtime) runtime(source cha<- *Process){
+	go third_party(ctx, source)
+	rt.run_main_stack()
+	rt.looper()
+}
+
+func (rt *runtime)looper(){
+	rt.run_next_stack()
+	rt.run_promise_stack()
+
+	for {
+		rt.run_io_stack()
+		rt.run_next_stack()
+		rt.run_promise_stack()
+
+		rt.run_check_stack()
+		rt.run_next_stack()
+		rt.run_promise_stack()
+
+		rt.run_close_stack()
+		rt.run_next_stack()
+		rt.run_promise_stack()
+
+		if main_stack, promise_stack, ... is empty
+			break
+	}
+}
+
+*/
+
 
 func runner() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -74,9 +129,9 @@ func runner() {
 	done := make(chan signal, 50)
 
 	env := &env{
-		stack:   &queue{},
-		micro:   &queue{},
-		promise: &queue{},
+		stack:   &queue_{},
+		micro:   &queue_{},
+		promise: &queue_{},
 	}
 
 	go env.loop(ctx, sig, done)
@@ -136,11 +191,11 @@ func (q *env) loop(ctx context.Context, sig chan signal, done chan signal) {
 	}
 }
 
-func exec_stack(q *queue)   {}
-func exec_micro(q *queue)   {}
-func exec_promise(q *queue) {}
+func exec_stack(q *queue_)   {}
+func exec_micro(q *queue_)   {}
+func exec_promise(q *queue_) {}
 
-func readqueue(q *queue) {}
+func readqueue_(q *queue_) {}
 
 func (e *env) done() bool {
 	// need to lock everything here
