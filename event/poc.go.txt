@@ -72,13 +72,30 @@ So the new issue is that these apis dont really ever
 start doing their work? But it's kinda funky trying to 
 tell go routines to do work if theres something in their queue
 
-func third_party(ctx, source <-chan *Process){
+* so for every routine we run, we can have a counter update here 
+* that the looper can infer on. One for incoming tasks, and one for executed tasks
+* i -> incoming
+* e -> executed
+* in_flight -> i - e
+* type rutime struct {
+*  incoming int
+*  executed int
+*  wg *sync.WaitGroup
+* }
+* so instead of who knows how many routines spawned increasing i, and mu everywhere, 
+* we could use wg to kind of guess that? if possible, we can check 
+* in_flight = len(wg.routines) 
+* and then looper can just break based on 
+* that but wg doesn't expose its counter so we might need to reach for atomic counters
+
+func third_party(ctx, rt *runtime, source <-chan *Process){
 	for {
 		select {
-			case p := <-source:
+			case p, ok := <-source:
+				if !ok { return }
 				switch p.Meta {
 					case promise:
-						 go run_promise(ctx, p, rt.promise_stack)
+						 go rt.run_promise(ctx, p, rt.promise_stack) // rt can update the wg.Add there
 					case io:
 						go run_io(ctx, p, rt.io_stack)
 					case timeout:
