@@ -100,6 +100,9 @@ func third_party(ctx, rt *runtime, source <-chan *Process){
 						go run_io(ctx, p, rt.io_stack)
 					case timeout:
 						go run_timeout(ctx, p, rt.timeout_stack)
+					case NoMeta:
+						add_stack(rt.stack, p)
+						
 				}
 			case <-ctx.Done():
 				return

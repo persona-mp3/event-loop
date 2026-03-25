@@ -6,7 +6,8 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"persona/runtime"
+	"persona/event"
+	"time"
 )
 
 func readFile() (any, error) {
@@ -16,6 +17,7 @@ func readFile() (any, error) {
 	}
 
 	_ = content
+	fmt.Println("read file successfully")
 	return "read file successfully", nil
 }
 
@@ -52,37 +54,37 @@ func readInput() (any, error) {
 	return result, nil
 }
 
-func mockFns() []*runtime.Task {
-	t1 := &runtime.Task{
+func newTasks() []*event.Process {
+	t1 := &event.Process{
 		Id:      "read_file",
 		Execute: readFile,
-		Meta:    runtime.PromiseMeta,
+		Meta:    event.IOMeta,
 	}
 
-	t2 := &runtime.Task{
+	t2 := &event.Process{
 		Id:      "read_input",
 		Execute: readInput,
-		Meta:    runtime.NoMeta,
+		Meta: event.NoMeta,
 	}
 
-	t3 := &runtime.Task{
-		Id:      "make-request",
-		Execute: makeHttpRequest,
-		Meta:    runtime.NextTickerMeta,
+	d2 := time.Second * 2
+	t3 := &event.Process{
+		Duration: &d2,
+		Id:       "make_request",
+		Execute:  makeHttpRequest,
+		Meta:     event.TimerMeta,
 	}
 
-	return []*runtime.Task{t1, t2, t3}
+	return []*event.Process{t1, t2, t3}
 }
 
 func main() {
-	tasks := mockFns()
-	rt := runtime.NewRuntime()
-	src := make(chan *runtime.Task)
-	go func() {
-		for _, t := range tasks {
-			src <- t
-		}
-	}()
-	rt.Start(src)
-	fmt.Println("shit your pants")
+	// tasks := newTasks()
+	// node := event.NewEnvironment()
+	// node.Stack = tasks
+	// node.Run()
+
+	rt := event.NewRunTime()
+	rt.Stack = newTasks()
+	rt.Run()
 }
