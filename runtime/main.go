@@ -2,13 +2,14 @@ package runtime
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"os"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
-// descibes the type and nature of Task
+// describes the type and nature of Task
 type Meta int
 
 type Task struct {
@@ -49,58 +50,55 @@ func NewRuntime() *Runtime {
 	}
 }
 
+var errLogger = log.New(os.Stderr, "[error] ", log.LstdFlags)
+
+// success logger
+var logger = log.New(os.Stdout, "[success] ", log.LstdFlags)
+
 func (rt *Runtime) Start(source <-chan *Task, done chan any) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// All synchronous code from the source will be executed first
-	// until it closes 
+	// until it closes
 	stackCh := make(chan *Task, 100)
 	go rt.startEnvironments(ctx, source, stackCh)
 
-	fmt.Println("executing stack fn")
+	// Once the source channel has been closed, this channel will also
+	// get closed, meaning, no more synchronous code to run, and we can
+	// proceed into looking to execute other queues
+	defer func() {
+		done <- true
+	}()
+	log.Printf("executing all sync code\n\n")
 	for task := range stackCh {
 		result, err := task.Execute()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "err executing func: %s\n", task.Id)
-			fmt.Fprintf(os.Stderr, "%3s\n", err)
+			errLogger.Printf("err executing func: %s\n", task.Id)
+			errLogger.Printf("%3s\n", err)
 			return
 		}
 
-		fmt.Println("result from func: ", task.Id)
-		fmt.Printf("%s\n\n", result)
+		logger.Println("result from func: ", task.Id)
+		logger.Printf("%s\n\n", result)
 	}
 
-	fmt.Println("executing next_tickers")
+	log.Printf("executing nextTickerQueue\n\n")
 	nextTickerQ := rt.drainQueue(rt.nextTickerQ)
-	for _, task := range nextTickerQ {
-		result, err := task.Execute()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "err executing func: %s\n", task.Id)
-			fmt.Fprintf(os.Stderr, "%3s\n", err)
-			return
-		}
-
-		fmt.Println("result from func: ", task.Id)
-		fmt.Printf("%s\n\n", result)
+	if err := execTasks(nextTickerQ); err != nil {
+		return
 	}
 
-	fmt.Println("executing promise queue")
+	log.Printf("executing promise queue\n\n")
 	promises := rt.drainQueue(rt.promiseQ)
-	for _, task := range promises {
-		result, err := task.resolve, task.reject
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "reject: while executing func: %s\n", task.Id)
-			fmt.Fprintf(os.Stderr, "%3s\n", err)
-			return
-		}
-
-		fmt.Println("promise resolved for func: ", task.Id)
-		fmt.Printf("%s\n\n", result)
+	if err := execPromises(promises); err != nil {
+		return
 	}
 
 	rt.eventLoop(ctx)
-	done <- true
+
+	// The receiver will always be waiting. This is to make sure
+	// that the caller doesn't exit before we finish executing all tasks
 }
 
 const (
@@ -121,7 +119,6 @@ const (
 // NoMeta tasks are appended directly to the stack, because
 // these are synchronous tasks
 func (rt *Runtime) startEnvironments(ctx context.Context, src <-chan *Task, stackCh chan<- *Task) {
-	fmt.Println("environment started")
 
 	prefix := "env: "
 	defer close(stackCh)
@@ -132,7 +129,7 @@ func (rt *Runtime) startEnvironments(ctx context.Context, src <-chan *Task, stac
 			return
 		case t, open := <-src:
 			if !open {
-				fmt.Printf("%s source closed\n", prefix)
+				logger.Printf("%s source closed\n", prefix)
 				return
 			}
 
@@ -154,53 +151,31 @@ func (rt *Runtime) startEnvironments(ctx context.Context, src <-chan *Task, stac
 // order described in the docs. It breaks out by checking that the number of inflight go-routines
 // is 0, otherwise, it continues running
 func (rt *Runtime) eventLoop(ctx context.Context) {
-	_ = ctx
+	defer cleanUp()
+
 	pref := "evt_loop"
 	for {
+		time.Sleep(20) // avoid averruning
+		if ctx.Err() != nil {
+			errLogger.Println("evtloop leaving, error-> ", ctx.Err())
+			return
+		}
+
 		if rt.inflight.Load() == 0 && len(rt.stack.tasks) == 0 {
-			fmt.Printf("%s total_inflight routines: %d\n", pref, rt.inflight.Load())
+			log.Printf("%s total_inflight routines: %d\n", pref, rt.inflight.Load())
 			break
 		}
 
-		stacks := rt.drainQueue(rt.stack)
-		for _, task := range stacks {
-			result, err := task.Execute()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "err executing func: %s\n", task.Id)
-				fmt.Fprintf(os.Stderr, "%3s\n", err)
-				return
-			}
-
-			fmt.Println("result from func: ", task.Id)
-			fmt.Printf("%s\n\n", result)
-		}
-
-		fmt.Println("executing next_tickers")
+		log.Printf("executing nextTicker queue\n\n")
 		nextTickerQ := rt.drainQueue(rt.nextTickerQ)
-		for _, task := range nextTickerQ {
-			result, err := task.Execute()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "err executing func: %s\n", task.Id)
-				fmt.Fprintf(os.Stderr, "%3s\n", err)
-				return
-			}
-
-			fmt.Println("result from func: ", task.Id)
-			fmt.Printf("%s\n\n", result)
+		if err := execTasks(nextTickerQ); err != nil {
+			return
 		}
 
-		fmt.Println("execuing promise queue")
+		log.Printf("execuing promise queue\n\n")
 		promises := rt.drainQueue(rt.promiseQ)
-		for _, task := range promises {
-			result, err := task.resolve, task.reject
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "reject: while executing func: %s\n", task.Id)
-				fmt.Fprintf(os.Stderr, "%3s\n", err)
-				return
-			}
-
-			fmt.Println("promise resolved for func: ", task.Id)
-			fmt.Printf("%s\n\n", result)
+		if err := execPromises(promises); err != nil {
+			return
 		}
 	}
 }
@@ -219,12 +194,6 @@ func (rt *Runtime) drainQueue(q *queue) []*Task {
 	q.mu.Unlock()
 
 	return snapshot
-}
-
-func appendToQueue(q *queue, t *Task) {
-	q.mu.Lock()
-	q.tasks = append(q.tasks, t)
-	q.mu.Unlock()
 }
 
 type fn func() (any, error)
@@ -266,12 +235,4 @@ func (rt *Runtime) wrapPromise(t *Task) {
 func (rt *Runtime) execPromise(t *Task) {
 	rt.inflight.Add(1)
 	rt.wrapPromise(t)
-	// pref := "promise_q"
-	// fmt.Printf("%s executing %s\n", pref, t.Id)
-	// rt.inflight.Add(1)
-	// result, err := t.Execute()
-	// t.reject = err
-	// t.resolve = result
-	// appendToQueue(rt.promiseQ, t)
-	// rt.inflight.Add(-1)
 }

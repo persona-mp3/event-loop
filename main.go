@@ -39,7 +39,7 @@ func makeHttpRequest() (any, error) {
 	// fmt.Println(string(content))
 	t := time.Since(n)
 	fmt.Printf("tt for whole_request: %+v\n", t)
-	return "http_request successfull", nil
+	return "http_request successfull", io.EOF
 }
 
 func readInput() (any, error) {
@@ -61,7 +61,9 @@ func mockFns() []*runtime.Task {
 	t1 := &runtime.Task{
 		Id:      "read_file",
 		Execute: readFile,
-		Meta:    runtime.PromiseMeta,
+		// import fs from "fs/promises"
+		// fs.open() -> IOQueue -> C++, io-operation -> result -> Node -> result, error -> promise (resolve, reject)
+		Meta: runtime.PromiseMeta,
 	}
 
 	t2 := &runtime.Task{
