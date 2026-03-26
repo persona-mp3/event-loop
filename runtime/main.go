@@ -53,17 +53,13 @@ func (rt *Runtime) Start(source <-chan *Task, done chan any) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// need to make sure that other channles have started and are ready
-	ready := make(chan bool)
-	go rt.startEnvironments(ctx, source, ready)
+	// All synchronous code from the source will be executed first
+	// until it closes 
+	stackCh := make(chan *Task, 100)
+	go rt.startEnvironments(ctx, source, stackCh)
 
-	<-ready
-	fmt.Println("recvd start opt")
-
-	stack := rt.drainQueue(rt.stack)
-
-	fmt.Println("running from stack")
-	for _, task := range stack {
+	fmt.Println("executing stack fn")
+	for task := range stackCh {
 		result, err := task.Execute()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "err executing func: %s\n", task.Id)
@@ -89,7 +85,7 @@ func (rt *Runtime) Start(source <-chan *Task, done chan any) {
 		fmt.Printf("%s\n\n", result)
 	}
 
-	fmt.Println("execuing promise queue")
+	fmt.Println("executing promise queue")
 	promises := rt.drainQueue(rt.promiseQ)
 	for _, task := range promises {
 		result, err := task.resolve, task.reject
@@ -119,15 +115,16 @@ const (
 
 // All tasks that are not syncrhonous ie NoMeta have
 // their code executed in a seperate goroutine. When done,
+
 // they append their results to their respective Queues.
 //
 // NoMeta tasks are appended directly to the stack, because
 // these are synchronous tasks
-func (rt *Runtime) startEnvironments(ctx context.Context, src <-chan *Task, ready chan<- bool) {
+func (rt *Runtime) startEnvironments(ctx context.Context, src <-chan *Task, stackCh chan<- *Task) {
 	fmt.Println("environment started")
 
 	prefix := "env: "
-	ready <- true
+	defer close(stackCh)
 	for {
 		select {
 
@@ -141,8 +138,7 @@ func (rt *Runtime) startEnvironments(ctx context.Context, src <-chan *Task, read
 
 			switch t.Meta {
 			case NoMeta:
-				// might be better to just execute here?
-				appendToQueue(rt.stack, t)
+				stackCh <- t
 			case NextTickerMeta: // no speical operations get ran in the nextTickerQ, its just like appending to the stack
 				appendToQueue(rt.nextTickerQ, t)
 			case PromiseMeta:
@@ -154,7 +150,6 @@ func (rt *Runtime) startEnvironments(ctx context.Context, src <-chan *Task, read
 	}
 }
 
-
 // Starts at the IO Queue, then to the MicroQueues and then follows sequential
 // order described in the docs. It breaks out by checking that the number of inflight go-routines
 // is 0, otherwise, it continues running
@@ -162,9 +157,50 @@ func (rt *Runtime) eventLoop(ctx context.Context) {
 	_ = ctx
 	pref := "evt_loop"
 	for {
-		if rt.inflight.Load() == 0 {
+		if rt.inflight.Load() == 0 && len(rt.stack.tasks) == 0 {
 			fmt.Printf("%s total_inflight routines: %d\n", pref, rt.inflight.Load())
 			break
+		}
+
+		stacks := rt.drainQueue(rt.stack)
+		for _, task := range stacks {
+			result, err := task.Execute()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "err executing func: %s\n", task.Id)
+				fmt.Fprintf(os.Stderr, "%3s\n", err)
+				return
+			}
+
+			fmt.Println("result from func: ", task.Id)
+			fmt.Printf("%s\n\n", result)
+		}
+
+		fmt.Println("executing next_tickers")
+		nextTickerQ := rt.drainQueue(rt.nextTickerQ)
+		for _, task := range nextTickerQ {
+			result, err := task.Execute()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "err executing func: %s\n", task.Id)
+				fmt.Fprintf(os.Stderr, "%3s\n", err)
+				return
+			}
+
+			fmt.Println("result from func: ", task.Id)
+			fmt.Printf("%s\n\n", result)
+		}
+
+		fmt.Println("execuing promise queue")
+		promises := rt.drainQueue(rt.promiseQ)
+		for _, task := range promises {
+			result, err := task.resolve, task.reject
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "reject: while executing func: %s\n", task.Id)
+				fmt.Fprintf(os.Stderr, "%3s\n", err)
+				return
+			}
+
+			fmt.Println("promise resolved for func: ", task.Id)
+			fmt.Printf("%s\n\n", result)
 		}
 	}
 }

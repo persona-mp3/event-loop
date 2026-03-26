@@ -84,6 +84,7 @@ func main() {
 	rt := runtime.NewRuntime()
 	src := make(chan *runtime.Task)
 	go func() {
+		defer close(src)
 		for _, t := range tasks {
 			src <- t
 		}
@@ -101,13 +102,14 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		res, open := <-done
+		res, open := <-done // could change it to return exit code
 		if !open {
 			fmt.Println("the runtime closed the done channel!")
 			return
 		}
 
-		fmt.Printf("recvd: <%+v> from runtime\n", res)
+		fmt.Println("Done executing all code", res)
+
 	}()
 
 	wg.Wait()
