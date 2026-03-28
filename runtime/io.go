@@ -23,7 +23,7 @@ func (rt *Runtime) execIO(t *Task) {
 			return
 		case res := <-done:
 			_ = res
-			appendToQueue(rt.ioQ, t)
+			// appendToQueue(rt.ioQ, t)
 
 		}
 	}()

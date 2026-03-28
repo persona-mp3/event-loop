@@ -20,8 +20,6 @@ const (
 
 	// Async/Await task
 	PromiseMeta
-
-	IOMeta
 )
 
 type Task struct {
@@ -44,7 +42,6 @@ type Runtime struct {
 	inflight    *atomic.Int64
 	stack       *queue
 	promiseQ    *queue
-	ioQ         *queue
 	nextTickerQ *queue
 	ctx         context.Context
 }
@@ -60,7 +57,6 @@ func NewRuntime() *Runtime {
 		inflight:    &atomic.Int64{},
 		stack:       newQueue(),
 		promiseQ:    newQueue(),
-		ioQ:         newQueue(),
 		nextTickerQ: newQueue(),
 	}
 }
@@ -148,8 +144,8 @@ func (rt *Runtime) startEnvironments(ctx context.Context, src <-chan *Task, stac
 				appendToQueue(rt.nextTickerQ, t)
 			case PromiseMeta:
 				go rt.execPromise(t)
-			case IOMeta:
-				go rt.execIO(t)
+			// case IOMeta:
+			// 	go rt.execIO(t)
 
 			}
 
