@@ -67,7 +67,7 @@ func mockFns() []*runtime.Task {
 	t2 := &runtime.Task{
 		Id:      "read_input",
 		Execute: readInput,
-		Meta:    runtime.NoMeta,
+		Meta:    runtime.SyncMeta,
 	}
 
 	t3 := &runtime.Task{

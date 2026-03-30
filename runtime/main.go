@@ -12,14 +12,22 @@ import (
 // describes the type and nature of Task
 type Meta int
 
+// Now IOMeta and NoMeta supposedly mean the same thing
+// to run this function synchornously. But v8 can't do syscalls
+// so it has to rely on libuv hence, the seperation
+
 const (
+
 	// Synchronous task
-	NoMeta Meta = iota
+	SyncMeta Meta = iota
 
 	NextTickerMeta
 
 	// Async/Await task
 	PromiseMeta
+
+	IOMeta
+	AsyncIOMeta
 )
 
 type Task struct {
@@ -138,14 +146,16 @@ func (rt *Runtime) startEnvironments(ctx context.Context, src <-chan *Task, stac
 			}
 
 			switch t.Meta {
-			case NoMeta:
+			case SyncMeta:
 				stackCh <- t
 			case NextTickerMeta: // no speical operations get ran in the nextTickerQ, its just like appending to the stack
 				appendToQueue(rt.nextTickerQ, t)
 			case PromiseMeta:
-				go rt.execPromise(t)
-			// case IOMeta:
-			// 	go rt.execIO(t)
+				go rt.nodeExecPromise(t)
+			case AsyncIOMeta:
+				rt.nodeWrapPromise(ctx, t)
+				// case IOMeta:
+				// 	go rt.execIO(t)
 
 			}
 
@@ -213,14 +223,14 @@ type result struct {
 // runIO simulates libuv's C++ os capabilities. After executing fn
 // it's result and error are both passed into the done channel.
 // Callers should run this in a goroutine to avoid blocking
-func runIO(ctx context.Context, fn fn, done chan<- *result) {
-	res, err := fn()
-	select {
-	case <-ctx.Done():
-		return
-	case done <- &result{success: res, err: err}:
-	}
-}
+// func runIO(ctx context.Context, fn fn, done chan<- *result) {
+// 	res, err := fn()
+// 	select {
+// 	case <-ctx.Done():
+// 		return
+// 	case done <- &result{success: res, err: err}:
+// 	}
+// }
 
 // This is to simulate Node & C++ bindings itself. When a task is marked as async
 // or it's nature involves async/await, the libuv (for io, etc) executes the task
@@ -230,24 +240,25 @@ func runIO(ctx context.Context, fn fn, done chan<- *result) {
 // The async bound task is ran in a routine, it's result is wrapped, and then
 // added into the 'promise' queue. This fuction is none blocking. When the result
 // has been wrapped, the goroutine reduces the inflight field in rt *Runtime
-func (rt *Runtime) wrapPromise(t *Task) {
-	done := make(chan *result)
-	go runIO(rt.ctx, t.Execute, done)
-	go func() {
-		select {
-		case <-rt.ctx.Done():
-			return
-		case res := <-done:
-			t.reject = res.err
-			t.resolve = res.success
-			appendToQueue(rt.promiseQ, t)
-			rt.inflight.Add(-1)
-		}
 
-	}()
-}
+// func (rt *Runtime) _wrapPromise(t *Task) {
+// 	done := make(chan *result)
+// 	go runIO(rt.ctx, t.Execute, done)
+// 	go func() {
+// 		select {
+// 		case <-rt.ctx.Done():
+// 			return
+// 		case res := <-done:
+// 			t.reject = res.err
+// 			t.resolve = res.success
+// 			appendToQueue(rt.promiseQ, t)
+// 			rt.inflight.Add(-1)
+// 		}
+//
+// 	}()
+// }
 
-func (rt *Runtime) execPromise(t *Task) {
-	rt.inflight.Add(1)
-	rt.wrapPromise(t)
-}
+// func (rt *Runtime) execPromise(t *Task) {
+// 	rt.inflight.Add(1)
+// 	rt.wrapPromise(t)
+// }
