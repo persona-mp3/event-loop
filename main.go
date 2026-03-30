@@ -12,13 +12,12 @@ import (
 )
 
 func readFile() (any, error) {
-	content, err := os.ReadFile("main.go.txt")
+	content, err := os.ReadFile("gitlogs.txt")
 	if err != nil {
 		return nil, err
 	}
 
-	_ = content
-	return "read file successfully", nil
+	return string(content), nil
 }
 
 func makeHttpRequest() (any, error) {
@@ -61,7 +60,7 @@ func mockFns() []*runtime.Task {
 		Execute: readFile,
 		// import fs from "fs/promises"
 		// fs.open() -> IOQueue -> C++, io-operation -> result -> Node -> result, error -> promise (resolve, reject)
-		Meta: runtime.PromiseMeta,
+		Meta: runtime.AsyncIOMeta,
 	}
 
 	t2 := &runtime.Task{

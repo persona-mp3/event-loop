@@ -48,6 +48,7 @@ type queue struct {
 }
 
 type Runtime struct {
+	// Current number io-bound goroutine workers
 	inflight    *atomic.Int64
 	stack       *queue
 	promiseQ    *queue
@@ -80,7 +81,6 @@ func (rt *Runtime) Start(source <-chan *Task, done chan any) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	rt.ctx = ctx
 
 	// All synchronous code from the source will be executed first
 	// until it closes
@@ -91,6 +91,7 @@ func (rt *Runtime) Start(source <-chan *Task, done chan any) {
 	// The receiver will always be waiting. This is to make sure
 	// that the caller doesn't exit before we finish executing all tasks
 	defer func() {
+		rt.debugInfo()
 		done <- rt.exitStatus
 	}()
 
@@ -185,6 +186,8 @@ func (rt *Runtime) eventLoop(ctx context.Context) {
 		if rt.inflight.Load() == 0 && len(rt.stack.tasks) == 0 {
 			log.Printf("%s total_inflight routines: %d\n", pref, rt.inflight.Load())
 			break
+		} else {
+			rt.debugInfo()
 		}
 
 		log.Printf("executing nextTicker queue\n\n")

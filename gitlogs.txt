@@ -1,0 +1,148 @@
+commit 37bf68c93e022d64bfd8f4b899e24901ad8eba2f
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Mon Mar 30 12:49:08 2026 +0100
+
+    added exit code status
+
+commit 004ccbcaaf179c77d90520fc0c8f4e57201b9c2d
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Mon Mar 30 12:36:59 2026 +0100
+
+    refactoed io api
+
+commit 7d3e074950bbdaebd125b70076134db59d1854e5
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Sat Mar 28 20:22:52 2026 +0000
+
+    added contrib race-test to readme
+
+commit b8b9564d544c9a758d1ab52b97523a7bb3477e05
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Sat Mar 28 14:40:45 2026 +0000
+
+    chore readme
+
+commit 55b8506353676064248ab854bcb7607b62d69943
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Sat Mar 28 14:39:12 2026 +0000
+
+    chore corrected README
+
+commit cb3f8b582ee401c14d7c2cfc3f78fc961e28424e
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Sat Mar 28 14:37:36 2026 +0000
+
+    chore updated readme
+
+commit 88ec629b9e9f23b375e07b1c19074a0a5c16843b
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Sat Mar 28 14:34:54 2026 +0000
+
+    chore: added README.md
+
+commit 6af7dec53d30d2b8e634a207f4159deaa069bf5a
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Fri Mar 27 12:10:20 2026 +0000
+
+    refactoring for new ioqueue
+
+commit 0f2efa70aeb66a23a57ea01f12ae87b987c35ae7
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Thu Mar 26 23:37:36 2026 +0000
+
+    refactored code
+
+commit 7d935ee3d5569bc02fa11ecc70662aef8ee32fe3
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Thu Mar 26 07:52:25 2026 +0000
+
+    fixed data race by changing the main stack to a channel and executing sync code from it
+
+commit d1dbd7346b2a3908419c48aa88e900c1fb9dd6ea
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Wed Mar 25 18:21:47 2026 +0000
+
+    bug: non-determinstic result
+
+commit eefa7a04fc89240775f2d74e2b031e107c93ff07
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Wed Mar 25 17:23:31 2026 +0000
+
+    design bug
+
+commit 95b0fa46026a6f5794be46ccf405783fca51285c
+Author: Daniel <randomnobscurebs@gmail.com>
+Date:   Wed Mar 25 14:35:10 2026 +0000
+
+    Enhance third_party with task management struct
+    
+    Added runtime struct to manage incoming and executed tasks with a WaitGroup. Updated third_party function to handle channel closure and utilize the new struct.
+
+commit faf11dcd6e1e435f4a8605750619797ff2f1308a
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Wed Mar 25 13:56:57 2026 +0000
+
+    chore: implementation hurdles
+
+commit 04d05d30c381876bf46f928413d3ced27f7299f7
+Merge: 0b55fdd 512e455
+Author: Daniel <randomnobscurebs@gmail.com>
+Date:   Wed Mar 25 12:06:33 2026 +0000
+
+    Merge pull request #1 from persona-mp3/dev
+    
+    Dev
+
+commit 512e455ab296f05d8f616c6604e16afd511c8d5d
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Wed Mar 25 12:03:37 2026 +0000
+
+    chore: modelled proof of concept
+
+commit ac903ddcfc492d36ffa0cf0b8dbbf4a9d52c2289
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Wed Mar 25 00:45:26 2026 +0000
+
+    brainstorm context switching model
+
+commit 49bbf52869283aff733c1f5f44f2967f4aeb8459
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Tue Mar 24 23:41:37 2026 +0000
+
+    bug: fixed race condition
+
+commit 1130aa5d92645304722b2d4a86b4098f0941bdc6
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Tue Mar 24 23:03:44 2026 +0000
+
+    chore: thinking about reading queues
+
+commit 1381485f74c3709d182491adf92f021617f1ca95
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Tue Mar 24 18:51:53 2026 +0000
+
+    chore cleared queues using nil
+
+commit 90617e835d1072388bfd283d628ba74b44e2cb3c
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Tue Mar 24 18:37:55 2026 +0000
+
+    feat: micro-task queue
+
+commit 0b55fdd31d13d4e6c9fe7e7ca245ac375b4504db
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Tue Mar 24 00:19:41 2026 +0000
+
+    buffered cbCh and corrected cancellation
+
+commit 93cf94ed07332b62bbd4183bdb7a668eb6f3afe3
+Author: persona-mp3 <randomnobscurebs@gmail.com>
+Date:   Tue Mar 24 00:14:50 2026 +0000
+
+    refactored code
+
+commit b2f2eaebd02740a1342f02a424d310e66043cdfc
+Author: ddanielaiwuyo <aiwuyoeghosadaniel2@gmail.com>
+Date:   Mon Mar 23 19:12:47 2026 +0000
+
+    initial commit
