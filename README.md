@@ -24,10 +24,10 @@ Now the aim of this project is just to simply simulate the order of execution of
 and how it assigns different functions to different API's withing the Node Runtime. 
 
 1. Highest Order Priority Queues: `Microtask` queue which consists of `Nextticker` and 'Promise' queues
+3. IO Queue
 
 The left rest to implement are:
 2. Timer Queue 
-3. IO Queue
 4. Check Queue
 5. Close Queue
 
@@ -131,4 +131,4 @@ harder. You can use go's built in race detector
 go run --race main.go
 ```
 
-It will interrupt the whole program if there are race conditions
+It will interrupt the program if there are race conditions

@@ -28,6 +28,8 @@ const (
 
 	IOMeta
 	AsyncIOMeta
+
+	TimerMeta
 )
 
 type Task struct {
@@ -53,6 +55,7 @@ type Runtime struct {
 	stack       *queue
 	promiseQ    *queue
 	nextTickerQ *queue
+	timerQ      *queue
 	exitStatus  int
 	ctx         context.Context
 }
@@ -68,6 +71,7 @@ func NewRuntime() *Runtime {
 		inflight:    &atomic.Int64{},
 		stack:       newQueue(),
 		promiseQ:    newQueue(),
+		timerQ:      newQueue(),
 		nextTickerQ: newQueue(),
 	}
 }
@@ -80,7 +84,6 @@ var logger = log.New(os.Stdout, "[success] ", log.LstdFlags)
 func (rt *Runtime) Start(source <-chan *Task, done chan any) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 
 	// All synchronous code from the source will be executed first
 	// until it closes
@@ -268,7 +271,3 @@ type result struct {
 // 	}()
 // }
 
-// func (rt *Runtime) execPromise(t *Task) {
-// 	rt.inflight.Add(1)
-// 	rt.wrapPromise(t)
-// }

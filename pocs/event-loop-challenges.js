@@ -1,6 +1,15 @@
 // src: https://event-loop-visualizer-ruby.vercel.app/
 // Theres an issue or is just a misunderstanding or non-deterministic
 // or idk anything. The site favors the Promise queue over the nextTicker queue
+// 
+// Order of output
+// Start, 
+// End, 
+// Promise1, 
+// Timeout, 
+// NextTick, 
+// Promise inside Timeout,
+// Timeout inside promise
 function complex_1() {
 	console.log('Start');
 
@@ -25,6 +34,14 @@ function complex_1() {
 
 }
 
+// Start
+// End
+// Promise 1
+// Immediate 1
+// Timeout 1
+// Next Tick Inside
+// Promise inside timeout
+// Timeout inside promise
 function complex_2() {
 	console.log('Start');
 
