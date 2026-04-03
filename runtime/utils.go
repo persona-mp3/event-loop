@@ -6,10 +6,17 @@ import "log"
 // to clear all other queues, but while this doesn't seem
 // neccessary at the moment, it's good to have in mind
 func cleanUp(rt *Runtime) {
-	logger.Println("cleaning up")
+	logger.Println("cleaning up DBUEGGG")
+	// I think this the problem for the third time
+	// When we error out, we just head straight out for 
+	// the function...but this is something I'd need to diagnose
+
 }
 
 func execTasks(tasks []*Task) error {
+	if len(tasks) == 0 {
+		return nil
+	}
 	for _, t := range tasks {
 		result, err := t.Execute()
 		if err != nil {
@@ -18,10 +25,10 @@ func execTasks(tasks []*Task) error {
 			return err
 		}
 
-		logger.Println("what are you doing?")
-
-		logger.Println("result from func: ", t.Id)
-		logger.Printf("%s\n\n", result)
+		// logger.Println("result from func: ", t.Id)
+		logger.Println()
+		logger.Printf("\n=======================%s=======================\n", t.Id)
+		logger.Printf("%s\n==============================================\n", result)
 	}
 	return nil
 }
@@ -64,9 +71,11 @@ func (rt *Runtime) debugInfo() {
   2. Next Ticker Queue:  %+v
   
   3. Promise Queue: %+v
+
+  4. Timer Queue: %+v
   
 	`,
 		rt.inflight.Load(), len(rt.stack.tasks), len(rt.nextTickerQ.tasks),
-		len(rt.promiseQ.tasks), rt.stack.tasks, rt.nextTickerQ.tasks, rt.promiseQ.tasks,
+		len(rt.promiseQ.tasks), rt.stack.tasks, rt.nextTickerQ.tasks, rt.promiseQ.tasks, rt.timerQ.tasks,
 	)
 }

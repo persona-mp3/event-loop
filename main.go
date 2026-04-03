@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,7 +11,7 @@ import (
 )
 
 func readFile() (any, error) {
-	content, err := os.ReadFile("gitlogs.txt")
+	content, err := os.ReadFile("test-file.txt")
 	if err != nil {
 		return nil, err
 	}
@@ -35,47 +34,47 @@ func makeHttpRequest() (any, error) {
 
 	_ = content
 	t := time.Since(n)
-	fmt.Printf("  total time to make request: %+v\n", t)
-	return "http_request successfull", nil
+	return fmt.Sprintf("%v to make request\n", t), nil
 }
 
 func readInput() (any, error) {
-	scanner := bufio.NewScanner(os.Stdin)
-	var username string
-	var bio string
-	fmt.Print("Please provide username: ")
-	scanner.Scan()
-	username = scanner.Text()
-	fmt.Print("Please provide bio: ")
-	scanner.Scan()
-	bio = scanner.Text()
+	return "Read Input", nil
+}
 
-	result := fmt.Sprintf("%s has a bio that says: %s\n", username, bio)
-	return result, nil
+func timerFunc() (any, error) {
+	return "Timer function completed", nil
 }
 
 func mockFns() []*runtime.Task {
 	t1 := &runtime.Task{
-		Id:      "read_file",
+		Id:      "THIRD_FUNCTION",
 		Execute: readFile,
-		// import fs from "fs/promises"
-		// fs.open() -> IOQueue -> C++, io-operation -> result -> Node -> result, error -> promise (resolve, reject)
-		Meta: runtime.AsyncIOMeta,
+		Meta:    runtime.AsyncIOMeta,
 	}
 
 	t2 := &runtime.Task{
-		Id:      "read_input",
+		Id:      "FIRST_FUNCTION",
 		Execute: readInput,
 		Meta:    runtime.SyncMeta,
 	}
 
 	t3 := &runtime.Task{
-		Id:      "make-request",
+		Id:      "SECOND FUNCTION",
 		Execute: makeHttpRequest,
 		Meta:    runtime.NextTickerMeta,
 	}
 
-	return []*runtime.Task{t1, t2, t3}
+	// NOTE: This will run last, because it will be sitting in the timeoutQueue for 4 seconds
+	// before then, all other functions could have been executed
+	d4 := time.Duration(4 * time.Second)
+	t4 := &runtime.Task{
+		Id:       "LAST_FUNCTION",
+		Execute:  timerFunc,
+		Meta:     runtime.TimerMeta,
+		Duration: &d4,
+	}
+
+	return []*runtime.Task{t1, t2, t3, t4}
 }
 
 func main() {

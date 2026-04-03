@@ -17,7 +17,6 @@ type Meta int
 // so it has to rely on libuv hence, the seperation
 
 const (
-
 	// Synchronous task
 	SyncMeta Meta = iota
 
@@ -29,6 +28,8 @@ const (
 	IOMeta
 	AsyncIOMeta
 
+	// So anytime we recv a task with a timer, we also expect
+	// a timer dutation
 	TimerMeta
 )
 
@@ -42,6 +43,8 @@ type Task struct {
 	// for promises.resolve and promises.reject
 	resolve any
 	reject  error
+
+	Duration *time.Duration
 }
 
 type queue struct {
@@ -51,13 +54,14 @@ type queue struct {
 
 type Runtime struct {
 	// Current number io-bound goroutine workers
-	inflight    *atomic.Int64
-	stack       *queue
-	promiseQ    *queue
-	nextTickerQ *queue
-	timerQ      *queue
-	exitStatus  int
-	ctx         context.Context
+	inflight     *atomic.Int64
+	stack        *queue
+	promiseQ     *queue
+	nextTickerQ  *queue
+	asyncIOQueue *queue
+	timerQ       *queue
+	exitStatus   int
+	ctx          context.Context
 }
 
 func newQueue() *queue {
@@ -68,11 +72,12 @@ func newQueue() *queue {
 }
 func NewRuntime() *Runtime {
 	return &Runtime{
-		inflight:    &atomic.Int64{},
-		stack:       newQueue(),
-		promiseQ:    newQueue(),
-		timerQ:      newQueue(),
-		nextTickerQ: newQueue(),
+		inflight:     &atomic.Int64{},
+		stack:        newQueue(),
+		promiseQ:     newQueue(),
+		asyncIOQueue: newQueue(),
+		timerQ:       newQueue(),
+		nextTickerQ:  newQueue(),
 	}
 }
 
@@ -94,8 +99,8 @@ func (rt *Runtime) Start(source <-chan *Task, done chan any) {
 	// The receiver will always be waiting. This is to make sure
 	// that the caller doesn't exit before we finish executing all tasks
 	defer func() {
-		rt.debugInfo()
 		done <- rt.exitStatus
+		rt.debugInfo()
 	}()
 
 	// if the stack is closed, synchronous code to run, and we can
@@ -110,22 +115,11 @@ func (rt *Runtime) Start(source <-chan *Task, done chan any) {
 			return
 		}
 
-		logger.Println("result from func: ", task.Id)
-		logger.Printf("%s\n\n", result)
-	}
-
-	log.Printf("executing nextTickerQueue\n\n")
-	nextTickerQ := rt.drainQueue(rt.nextTickerQ)
-	if err := execTasks(nextTickerQ); err != nil {
-		rt.exitStatus = 1
-		return
-	}
-
-	log.Printf("executing promise queue\n\n")
-	promises := rt.drainQueue(rt.promiseQ)
-	if err := execPromises(promises); err != nil {
-		rt.exitStatus = 1
-		return
+		logger.Println()
+		logger.Printf("\n=======================%s=======================\n", task.Id)
+		logger.Printf("%s\n==============================================\n", result)
+		// logger.Println("result from func: ", task.Id)
+		// logger.Printf("%s\n\n", result)
 	}
 
 	rt.eventLoop(ctx)
@@ -165,6 +159,9 @@ func (rt *Runtime) startEnvironments(ctx context.Context, src <-chan *Task, stac
 				go rt.nodeExecPromise(t)
 			case AsyncIOMeta:
 				rt.nodeWrapPromise(ctx, t)
+			case TimerMeta:
+				// ha, noope
+				go rt.nodeExecTimer(ctx, t)
 
 			}
 
@@ -178,31 +175,38 @@ func (rt *Runtime) startEnvironments(ctx context.Context, src <-chan *Task, stac
 func (rt *Runtime) eventLoop(ctx context.Context) {
 	defer cleanUp(rt)
 
-	pref := "evt_loop"
 	for {
-		time.Sleep(20 * time.Millisecond) // avoid overruning
+		// time.Sleep(20 * time.Millisecond) // avoid overruning
 		if ctx.Err() != nil {
 			errLogger.Println("evtloop leaving, error-> ", ctx.Err())
 			return
 		}
 
-		if rt.inflight.Load() == 0 && len(rt.stack.tasks) == 0 {
-			log.Printf("%s total_inflight routines: %d\n", pref, rt.inflight.Load())
+		if rt.queuesAreEmpty() {
 			break
-		} else {
-			rt.debugInfo()
 		}
 
-		log.Printf("executing nextTicker queue\n\n")
 		nextTickerQ := rt.drainQueue(rt.nextTickerQ)
 		if err := execTasks(nextTickerQ); err != nil {
 			rt.exitStatus = 1
 			return
 		}
 
-		log.Printf("execuing promise queue\n\n")
 		promises := rt.drainQueue(rt.promiseQ)
 		if err := execPromises(promises); err != nil {
+			rt.exitStatus = 1
+			return
+		}
+
+		timerQ := rt.drainQueue(rt.timerQ)
+		if err := execTasks(timerQ); err != nil {
+			rt.exitStatus = 1
+			return
+		}
+
+		// TODO: or is it because of the timer opts
+		asyncIOQ := rt.drainQueue(rt.asyncIOQueue)
+		if err := execTasks(asyncIOQ); err != nil {
 			rt.exitStatus = 1
 			return
 		}
@@ -231,6 +235,14 @@ type fn func() (any, error)
 type result struct {
 	success any
 	err     error
+}
+
+func (rt *Runtime) queuesAreEmpty() bool {
+	return (rt.inflight.Load() == 0 &&
+		len(rt.stack.tasks) == 0 &&
+		len(rt.nextTickerQ.tasks) == 0 &&
+		len(rt.timerQ.tasks) == 0 &&
+		len(rt.promiseQ.tasks) == 0)
 }
 
 // runIO simulates libuv's C++ os capabilities. After executing fn
@@ -270,4 +282,3 @@ type result struct {
 //
 // 	}()
 // }
-

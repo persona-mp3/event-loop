@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"time"
 )
 
 // NOTE: v8 cannot make syscalls or access the filesystem,
@@ -33,23 +34,55 @@ func (rt *Runtime) nodeExecPromise(t *Task) {
 // is AsyncIO. The results are appended to the IOQueue to be
 // resolved by the mainCaller
 func (rt *Runtime) nodeWrapPromise(ctx context.Context, t *Task) {
-	// keep track of goroutines doing io-bound tasks
-	// although im not sure yet, do the correspoding resolves, do we
-	// need to keep track of them?
+	logger.Println("DEBUG -> nodeWrapPromise: before: ", rt.inflight)
+	logger.Println("DEBUG -> after -> ", rt.inflight)
 	rt.inflight.Add(1)
 	done := make(chan *result)
 	childCtx, cancel := context.WithCancel(ctx)
 	go execAsyncIO(childCtx, t.Execute, done)
 	go func() {
 		defer cancel()
+		defer func() {
+			logger.Println("DEBUG -> NWP removing::", rt.inflight)
+			logger.Println("DEBUG -> NWP removed::", rt.inflight)
+		}()
+
 		select {
 		case <-ctx.Done():
+			rt.inflight.Add(-1)
 			return
 		case res := <-done:
 			t.reject = res.err
 			t.resolve = res.success
-			appendToQueue(rt.promiseQ, t)
+			appendToQueue(rt.asyncIOQueue, t)
 			rt.inflight.Add(-1)
+			return
 		}
 	}()
+}
+
+func (rt *Runtime) nodeExecTimer(ctx context.Context, t *Task) {
+	if t.Duration == nil {
+		logger.Println("Timer is Nil, assuming 0-seconds -> ", t.Duration)
+		appendToQueue(rt.timerQ, t)
+		return
+	}
+
+	// I think the problem is that we are adding a timer before/during the error
+	rt.inflight.Add(1)
+	defer func() {
+		logger.Println("DEBUG ] reducing inflightRoutines for execTimer", rt.inflight)
+		logger.Println("DEBUG ] after for execTimer", rt.inflight)
+	}()
+
+	timer := time.NewTimer(*t.Duration)
+
+	select {
+	case <-ctx.Done():
+		rt.inflight.Add(-1)
+		return
+	case <-timer.C:
+		rt.inflight.Add(-1)
+		appendToQueue(rt.timerQ, t)
+	}
 }
